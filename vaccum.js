@@ -165,7 +165,7 @@ function Drawer(id) {
             console.log(this.i + ' frame');
         }
 
-        this.ctx.clearRect(0,0,300,300);
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
 
         date = new Date();
         this.now = date.getTime()/1000;
