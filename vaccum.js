@@ -37,15 +37,11 @@ basicParticle.ctx = "to_be_overidden";
 basicParticle.draw = function(loc) {
     this.ctx.save();
     this.ctx.translate(loc.x,loc.y);
-    var radius = this.radius;
-    var radgrad = this.ctx.createRadialGradient(0,0,(radius*0.1), 0,0,radius);
-    radgrad.addColorStop(0, this.centerColor);
-    radgrad.addColorStop(0.3, this.mainColor);
-    radgrad.addColorStop(1, 'rgba(0,0,0,0)');
 
     // draw shapes
-    this.ctx.fillStyle = radgrad;
-    this.ctx.fillRect(-radius,-radius,radius*2,radius*2);
+    var r = this.radius;
+    this.ctx.fillStyle = this.radgrad;
+    this.ctx.fillRect(-r,-r,r*2,r*2);
     this.ctx.restore();
 }
 
@@ -54,77 +50,100 @@ particleTypeFactory = function(proto, ctx) {
         this.centerColor = centerColor;
         this.mainColor = mainColor;
         this.ctx = ctx;
+
         if (radius) {
             this.radius = radius;
         }
+        var radgrad = this.ctx.createRadialGradient(0,0,(this.radius*0.1), 0,0,this.radius);
+        radgrad.addColorStop(0, this.centerColor);
+        radgrad.addColorStop(0.3, this.mainColor);
+        radgrad.addColorStop(1, 'rgba(0,0,0,0)');
+        this.radgrad = radgrad;
     }
     gen.prototype = proto;
     return gen;
 };
 
+/*
+ * Particle Group
+ */
+Pgroup = function(theta, startPt, scale, left, center, right) {
+    this.theta = theta;
+    this.startPt = startPt;
+    this.left = left;
+    this.center = center;
+    this.right = right;
+    this.scale = scale;
+    this.age = 0;
+    this.velocity = 25;
+    this.birthTime = (new Date()).getTime()/1000;
+}
+
+Pgroup.prototype = {
+    bias: function() {
+        // a quadratic equation y = (t+1)**2 - 1
+        return (1 - Math.pow(((this.age*2/this.maxage)-1),2));
+    },
+
+    maxage: 2,
+
+    alphaByAge: function() {
+        var distToHell = Math.min(this.maxage - this.age, this.age);
+        return Math.abs(Math.min(distToHell*4, 1));
+    },
+
+    draw: function(now) {
+        this.age = now - this.birthTime;
+        var centerDisp = new Displacement(this.age * this.velocity, 0);
+        var bias = this.bias() * this.age * this.velocity;
+        this.prepareDraw();
+        this.center.draw(centerDisp.rotate(this.theta));
+        this.left.draw(centerDisp.add(new Displacement(0,bias)).rotate(this.theta));
+        this.right.draw(centerDisp.add(new Displacement(0,-bias)).rotate(this.theta));
+        this.endDraw();
+    },
+
+    prepareDraw: function() {
+        this.ctx.save();
+        this.ctx.translate(this.startPt.x, this.startPt.y);
+        this.ctx.scale(this.scale, this.scale);
+        this.ctx.globalAlpha = this.alphaByAge();
+    },
+    endDraw:  function(loc) {
+        this.ctx.restore();
+    }
+}
+
 function inverseExpDist(mean) {
-    return -mean * Math.log2(1-Math.random());
+    return -mean * Math.log(1-Math.random());
 }
 
 function Drawer() {
     this.canvas = document.getElementById('vaccum-space');
-    this.ctx = this.canvas.getContext('2d');
+    var ctx = this.canvas.getContext('2d');
+    this.ctx = ctx;
     this.pgroupList = [];
     this.now = 0;
     this.nextTime = 0;
     this.i = 0;
+    CustPgroup = function(theta, startPt, scale, left, center, right) {
+        Pgroup.call(this, theta, startPt, scale, left, center, right);
+        this.ctx = ctx;
+    }
+    CustPgroup.prototype = Object.create(Pgroup.prototype);
 
     this.canvas.style.backgroundColor = 'black';
 
-    /*
-     * Particle Group
-     */
-    Pgroup = function(theta, startPt, left, center, right) {
-        this.theta = theta;
-        this.startPt = startPt;
-        this.left = left;
-        this.center = center;
-        this.right = right;
-        this.age = 0;
-        this.velocity = 25;
-        this.scale = 1;
-        date = new Date();
-        this.birthTime = date.getTime()/1000;
-    }
-
-    Pgroup.prototype = {
-        bias : function() {
-            // a quadratic equation y = (t+1)**2 - 1
-            return (1 - Math.pow(((this.age*2/this.maxage)-1),2));
-        },
-
-        drawer: this,
-        maxage : 2,
-
-        draw : function() {
-            this.age = this.drawer.now - this.birthTime;
-            var centerDisp = new Displacement(this.age * this.velocity, 0);
-            var bias = this.bias() * this.age * this.velocity;
-            this.center.draw(this.startPt.add(centerDisp.rotate(this.theta)));
-            this.left.draw(this.startPt.add(centerDisp.add(new Displacement(0,bias)).rotate(this.theta)));
-            this.right.draw(this.startPt.add(centerDisp.add(new Displacement(0,-bias)).rotate(this.theta)));
-        }
-    }
 
     var particleFactory = particleTypeFactory(basicParticle, this.ctx);
     electron = new particleFactory('rgba(235,235,235,255)', 'rgba(0,200,255,255)');
     antiElectron = new particleFactory('rgba(0,100,150,255)', 'rgba(0,200,255,255)');
     photon = new particleFactory('rgba(255,255,230,255)', 'rgba(200,200,100,250)', 12);
 
-    console.log("init");
-
     this.tryGenGroup = function() {
-        if (this.i % 100 == 0) {
-            console.log("frame next time" + (this.nextTime - this.now));
-        }
         if (this.nextTime - this.now <= 0) {
             this.addGroup();
-            var interval = Math.min(7, inverseExpDist(Pgroup.prototype.maxage/2));
+            var interval = Math.min(7, inverseExpDist(CustPgroup.prototype.maxage/1.5));
             this.nextTime = interval + this.now;
             console.log("next time: " + (interval));
         }
@@ -136,8 +155,8 @@ function Drawer() {
         x = Math.random() * this.canvas.width;
         y = Math.random() * this.canvas.height;
         Math.random() > 0.5 ?
-            this.pgroupList.push(new Pgroup(theta, new Point(x, y), electron, photon, antiElectron)):
-            this.pgroupList.push(new Pgroup(theta, new Point(x, y), antiElectron, photon, electron));
+            this.pgroupList.push(new CustPgroup(theta, new Point(x, y), Math.random()*0.75+0.25, electron, photon, antiElectron)):
+            this.pgroupList.push(new CustPgroup(theta, new Point(x, y), Math.random()*0.75+0.25, antiElectron, photon, electron));
     }
 
     this.play = function() {
@@ -157,13 +176,12 @@ function Drawer() {
             if (grp.age >= grp.maxage) {
                 this.pgroupList.splice(i, 1);
             } else {
-                grp.draw();
+                grp.draw(this.now);
             }
         }
 
         var drawer = this;
-        next = function() {drawer.play()};
-        window.requestAnimationFrame(next);
+        window.requestAnimationFrame(function() {drawer.play()});
     };
 }
 
