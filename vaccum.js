@@ -33,7 +33,7 @@ basicParticle = {
     radius: 25
 };
 
-basicParticle.ctx = "to_be_overidden";
+basicParticle.ctx = 'to_be_overidden';
 basicParticle.draw = function(loc) {
     this.ctx.save();
     this.ctx.translate(loc.x,loc.y);
@@ -118,8 +118,8 @@ function inverseExpDist(mean) {
     return -mean * Math.log(1-Math.random());
 }
 
-function Drawer() {
-    this.canvas = document.getElementById('vaccum-space');
+function Drawer(id) {
+    this.canvas = document.getElementById(id);
     var ctx = this.canvas.getContext('2d');
     this.ctx = ctx;
     this.pgroupList = [];
@@ -145,12 +145,12 @@ function Drawer() {
             this.addGroup();
             var interval = Math.min(7, inverseExpDist(CustPgroup.prototype.maxage/1.5));
             this.nextTime = interval + this.now;
-            console.log("next time: " + (interval));
+            console.log('next time: ' + (interval));
         }
     }
 
     this.addGroup = function() {
-        console.log("adding group");
+        console.log('adding group');
         theta = Math.random() * 2 * Math.PI;
         x = Math.random() * this.canvas.width;
         y = Math.random() * this.canvas.height;
@@ -162,7 +162,7 @@ function Drawer() {
     this.play = function() {
         this.i = this.i + 1;
         if (this.i % 100 == 0) {
-            console.log(this.i + " frame");
+            console.log(this.i + ' frame');
         }
 
         this.ctx.clearRect(0,0,300,300);
@@ -185,6 +185,6 @@ function Drawer() {
     };
 }
 
-window.addEventListener("load", function() {
-    (new Drawer()).play();
+window.addEventListener('load', function() {
+    (new Drawer('vaccum-space')).play();
 });
